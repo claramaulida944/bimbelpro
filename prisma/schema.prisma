@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PeranPengguna {
+  ADMIN_PENGAJAR
+  SISWA
+}
+
+enum TipeKursus {
+  VIDEO_REKAMAN
+  VIDEOCALL_LIVE
+  HYBRID
+}
+
+enum TipeAksesHarga {
+  GRATIS
+  LANGGANAN
+  RINCOIN
+}
+
+enum TipeMateri {
+  VIDEO_STREAM
+  EMBED_YOUTUBE
+  LINK_ZOOM
+  EBOOK_PDF
+}
+
+enum PaketLangganan {
+  MINGGUAN
+  BULANAN
+  SEMESTER
+}
+
+enum TipeTransaksiKoin {
+  TOPUP_SALDO
+  BELI_KURSUS
+  AKSES_MATERI
+  CHAT_AI_RINASENSEI
+  IKUT_SIMULASI_UJIAN
+}
+
+enum StatusTransaksi {
+  MENUNGGU_PEMBAYARAN
+  BERHASIL
+  GAGAL
+  KADALUARSA
+}
+
+enum StatusUjian {
+  SEDANG_DIKERJAKAN
+  SELESAI
+  DIDISKUALIFIKASI_CURANG
+  DIRESET_PENGAJAR
+}
+
+enum TipePelanggaranUjian {
+  PINDAH_TAB
+  LAYAR_TIDAK_FOKUS
+  KELUAR_FULLSCREEN
+  AKSES_DEVTOOLS
+  KLIK_KANAN_TERDETEKSI
+}
+
+enum KategoriPengaturan {
+  AI_RINASENSEI
+  PAYMENT_GATEWAY
+  WHATSAPP_GATEWAY
+  VIDEO_PROVIDER
+  SISTEM_UMUM
+}
+
+enum StatusPesanWA {
+  MENUNGGU_PENGIRIMAN
+  TERKIRIM
+  GAGAL
+}
+
+enum TipePesanWA {
+  TAGIHAN
+  JADWAL_KELAS
+  PENGINGAT_UJIAN
+  BLAST_UMUM
+}
+
+model Pengguna {
+  id                String        @id @default(cuid())
+  nama              String
+  email             String        @unique
+  noTelepon         String?
+  passwordHash      String
+  peran             PeranPengguna
+  saldoRinCoin      Int           @default(0)
+  tanggalDibuat     DateTime      @default(now())
+  tanggalDiperbarui DateTime      @updatedAt
+
+  langgananSiswa   LanggananSiswa[]
+  transaksiRinCoin TransaksiRinCoin[]
+  riwayatUjian     SesiUjianSiswa[]
+  logChatAI        LogChatAI[]
+}
+
+model PengaturanSistem {
+  id            String             @id @default(cuid())
+  kunci         String             @unique
+  nilai         String
+  kategori      KategoriPengaturan
+  deskripsi     String?
+  adalahRahasia Boolean            @default(false)
+  diubahPada    DateTime           @updatedAt
+}
+
+model Kursus {
+  id             String         @id @default(cuid())
+  judul          String
+  slug           String         @unique
+  deskripsi      String?
+  tipeKursus     TipeKursus
+  tipeAksesHarga TipeAksesHarga
+  hargaRinCoin   Int?
+  apakahAktif    Boolean        @default(true)
+  idPengajar     String
+  tanggalDibuat  DateTime       @default(now())
+
+  materiKursus   MateriKursus[]
+  langgananSiswa LanggananSiswa[]
+}
+
+model MateriKursus {
+  id                    String     @id @default(cuid())
+  idKursus              String
+  judulMateri           String
+  tipeMateri            TipeMateri
+  kontenUrl             String?
+  kontenTeks            String?    @db.Text
+  urutan                Int
+  apakahPratinjauGratis Boolean    @default(false)
+
+  kursus Kursus @relation(fields: [idKursus], references: [id], onDelete: Cascade)
+}
+
+model LanggananSiswa {
+  id              String         @id @default(cuid())
+  idSiswa         String
+  idKursus        String?
+  paketLangganan  PaketLangganan
+  tanggalMulai    DateTime
+  tanggalBerakhir DateTime
+  apakahAktif     Boolean        @default(true)
+
+  siswa  Pengguna @relation(fields: [idSiswa], references: [id], onDelete: Cascade)
+  kursus Kursus?  @relation(fields: [idKursus], references: [id], onDelete: SetNull)
+}
+
+model TransaksiRinCoin {
+  id                String            @id @default(cuid())
+  idSiswa           String
+  jumlahKoin        Int
+  totalRupiah       Int
+  tipeTransaksi     TipeTransaksiKoin
+  idReferensi       String?
+  status            StatusTransaksi
+  metadataTransaksi Json?
+  tanggalDibuat     DateTime          @default(now())
+
+  siswa Pengguna @relation(fields: [idSiswa], references: [id], onDelete: Cascade)
+}
+
+model PaketTopupKoin {
+  id          String  @id @default(cuid())
+  namaPaket   String
+  jumlahKoin  Int
+  hargaRupiah Int
+  apakahAktif Boolean @default(true)
+}
+
+model SimulasiUjian {
+  id                       String  @id @default(cuid())
+  judulUjian               String
+  deskripsi                String?
+  durasiMenit              Int
+  biayaRinCoin             Int     @default(0)
+  wajibFullscreen          Boolean @default(true)
+  batasMaksimalPelanggaran Int     @default(1)
+  apakahAktif              Boolean @default(true)
+  idPembuat                String
+
+  bankSoal       BankSoal[]
+  sesiUjianSiswa SesiUjianSiswa[]
+}
+
+model BankSoal {
+  id             String  @id @default(cuid())
+  idUjian        String
+  teksSoal       String  @db.Text
+  pilihanJawaban Json
+  kunciJawaban   String
+  pembahasan     String? @db.Text
+  labelTopik     String?
+
+  ujian SimulasiUjian @relation(fields: [idUjian], references: [id], onDelete: Cascade)
+}
+
+model SesiUjianSiswa {
+  id               String      @id @default(cuid())
+  idUjian          String
+  idSiswa          String
+  nilaiAkhir       Float       @default(0)
+  totalSoal        Int
+  jumlahBenar      Int
+  jumlahSalah      Int
+  status           StatusUjian
+  totalPelanggaran Int         @default(0)
+  waktuMulai       DateTime    @default(now())
+  waktuSelesai     DateTime?
+  lembarJawaban    Json?
+
+  ujian          SimulasiUjian         @relation(fields: [idUjian], references: [id], onDelete: Cascade)
+  siswa          Pengguna              @relation(fields: [idSiswa], references: [id], onDelete: Cascade)
+  logPelanggaran LogPelanggaranUjian[]
+}
+
+model LogPelanggaranUjian {
+  id              String               @id @default(cuid())
+  idSesiUjian     String
+  tipePelanggaran TipePelanggaranUjian
+  catatan         String?
+  waktuTerjadi    DateTime             @default(now())
+
+  sesiUjian SesiUjianSiswa @relation(fields: [idSesiUjian], references: [id], onDelete: Cascade)
+}
+
+model LogChatAI {
+  id              String   @id @default(cuid())
+  idSiswa         String?
+  peranPengirim   String
+  isiPesan        String   @db.Text
+  tokenDigunakan  Int      @default(0)
+  referensiMateri String?
+  waktuKirim      DateTime @default(now())
+
+  siswa Pengguna? @relation(fields: [idSiswa], references: [id], onDelete: SetNull)
+}
+
+model AntreanPesanWhatsApp {
+  id          String        @id @default(cuid())
+  noTujuan    String
+  isiPesan    String        @db.Text
+  tipePesan   TipePesanWA
+  status      StatusPesanWA
+  logRespon   Json?
+  jadwalKirim DateTime
+  dikirimPada DateTime?
+}
